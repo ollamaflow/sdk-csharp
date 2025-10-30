@@ -70,6 +70,8 @@ namespace TestOllamaFlowSdk
                 else if (userInput.Equals("openai-chat")) await TestOpenAIChatCompletion();
                 else if (userInput.Equals("openai-embeddings-single")) await TestOpenAIEmbeddingsSingle();
                 else if (userInput.Equals("openai-embeddings-multiple")) await TestOpenAIEmbeddingsMultiple();
+                else if (userInput.Equals("openai-stream-completion")) await TestOpenAIStreamingCompletion();
+                else if (userInput.Equals("openai-stream-chat")) await TestOpenAIStreamingChatCompletion();
                 else
                 {
                     Console.WriteLine("Unknown command. Type '?' for help.");
@@ -152,6 +154,8 @@ namespace TestOllamaFlowSdk
             Console.WriteLine("  openai-chat                  generate chat completion");
             Console.WriteLine("  openai-embeddings-single     generate embeddings for single text");
             Console.WriteLine("  openai-embeddings-multiple   generate embeddings for multiple texts");
+            Console.WriteLine("  openai-stream-completion     stream text completion chunks");
+            Console.WriteLine("  openai-stream-chat           stream chat completion chunks");
             Console.WriteLine();
             Console.WriteLine("AI Operations (Ollama API):");
             Console.WriteLine("  completion                   generate text completion (non-streaming, continuous conversation)");
@@ -185,6 +189,610 @@ namespace TestOllamaFlowSdk
                 InitializeSdk();
             }
         }
+
+        #region Backend-admin-Tests
+
+        private static async Task TestListBackends()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Listing all backends...");
+                var backends = await _Sdk.Backend.RetrieveMany();
+
+                if (backends != null && backends.Count > 0)
+                {
+                    Console.WriteLine($"Found {backends.Count} backends:");
+                    EnumerateResponse(backends);
+                }
+                else
+                {
+                    Console.WriteLine("No backends found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error listing backends: {ex.Message}");
+            }
+        }
+
+        private static async Task TestListBackendHealth()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Listing all backends with health status...");
+                var backends = await _Sdk.Backend.RetrieveAllHealth();
+
+                if (backends != null && backends.Count > 0)
+                {
+                    Console.WriteLine($"Found {backends.Count} backends:");
+                    EnumerateResponse(backends);
+                }
+                else
+                {
+                    Console.WriteLine("No backends found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error listing backend health: {ex.Message}");
+            }
+        }
+
+        private static async Task TestGetBackend()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Backend identifier:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Backend identifier is required.");
+                    return;
+                }
+
+                Console.WriteLine($"Getting backend: {identifier}...");
+                var backend = await _Sdk.Backend.Retrieve(identifier);
+
+                if (backend != null)
+                {
+                    Console.WriteLine("Backend found:");
+                    EnumerateResponse(backend);
+                }
+                else
+                {
+                    Console.WriteLine("Backend not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting backend: {ex.Message}");
+            }
+        }
+
+        private static async Task TestGetBackendHealth()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Backend identifier:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Backend identifier is required.");
+                    return;
+                }
+
+                Console.WriteLine($"Getting backend health: {identifier}...");
+                EnumerateResponse(await _Sdk.Backend.RetrieveHealth(identifier));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting backend health: {ex.Message}");
+            }
+        }
+
+        private static async Task TestBackendExists()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Backend identifier:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Backend identifier is required.");
+                    return;
+                }
+
+                Console.WriteLine($"Checking if backend exists: {identifier}...");
+                bool exists = await _Sdk.Backend.Exists(identifier);
+                Console.WriteLine($"Backend '{identifier}' exists: {exists}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking backend existence: {ex.Message}");
+            }
+        }
+
+        private static async Task TestCreateBackend()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Creating new backend...");
+
+                Backend request = BuildObject<Backend>();
+
+                if (string.IsNullOrEmpty(request.Identifier) || string.IsNullOrEmpty(request.Name))
+                {
+                    Console.WriteLine("Backend identifier and name are required.");
+                    return;
+                }
+
+                Console.WriteLine($"Creating backend '{request.Identifier}'...");
+                EnumerateResponse(await _Sdk.Backend.Create(request));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating backend: {ex.Message}");
+            }
+        }
+
+        private static async Task TestUpdateBackend()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Backend identifier to update:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Backend identifier is required.");
+                    return;
+                }
+
+                Backend request = BuildObject<Backend>();
+                Console.WriteLine($"Updating backend '{request.Identifier}'...");
+                EnumerateResponse(await _Sdk.Backend.Update(identifier, request));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating backend: {ex.Message}");
+            }
+        }
+
+        private static async Task TestDeleteBackend()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Backend identifier to delete:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Backend identifier is required.");
+                    return;
+                }
+
+                bool confirm = Inputty.GetBoolean($"Are you sure you want to delete backend '{identifier}'?", false);
+                if (!confirm)
+                {
+                    Console.WriteLine("Delete cancelled.");
+                    return;
+                }
+
+                Console.WriteLine($"Deleting backend: {identifier}...");
+                bool success = await _Sdk.Backend.Delete(identifier);
+
+                if (success)
+                {
+                    Console.WriteLine("Backend deleted successfully.");
+                }
+                else
+                {
+                    Console.WriteLine("Failed to delete backend.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deleting backend: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Frontend-admin-Tests
+
+        private static async Task TestListFrontends()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Listing all frontends...");
+                var frontends = await _Sdk.Frontend.RetrieveMany();
+
+                if (frontends != null && frontends.Count > 0)
+                {
+                    Console.WriteLine($"Found {frontends.Count} frontends:");
+                    EnumerateResponse(frontends);
+                }
+                else
+                {
+                    Console.WriteLine("No frontends found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error listing frontends: {ex.Message}");
+            }
+        }
+
+        private static async Task TestGetFrontend()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Frontend identifier:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Frontend identifier is required.");
+                    return;
+                }
+
+                Console.WriteLine($"Getting frontend: {identifier}...");
+                var frontend = await _Sdk.Frontend.Retrieve(identifier);
+
+                if (frontend != null)
+                {
+                    Console.WriteLine("Frontend found:");
+                    EnumerateResponse(frontend);
+                }
+                else
+                {
+                    Console.WriteLine("Frontend not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting frontend: {ex.Message}");
+            }
+        }
+
+        private static async Task TestFrontendExists()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Frontend identifier:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Frontend identifier is required.");
+                    return;
+                }
+
+                Console.WriteLine($"Checking if frontend exists: {identifier}...");
+                bool exists = await _Sdk.Frontend.Exists(identifier);
+                Console.WriteLine($"Frontend '{identifier}' exists: {exists}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking frontend existence: {ex.Message}");
+            }
+        }
+
+        private static async Task TestCreateFrontend()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Creating new frontend...");
+
+                Frontend request = BuildObject<Frontend>();
+
+                if (string.IsNullOrEmpty(request.Identifier) || string.IsNullOrEmpty(request.Name))
+                {
+                    Console.WriteLine("Frontend identifier and name are required.");
+                    return;
+                }
+
+                Console.WriteLine($"Creating frontend '{request.Identifier}'...");
+                EnumerateResponse(await _Sdk.Frontend.Create(request));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating frontend: {ex.Message}");
+            }
+        }
+
+        private static async Task TestUpdateFrontend()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Frontend identifier to update:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Frontend identifier is required.");
+                    return;
+                }
+
+                Frontend request = BuildObject<Frontend>();
+                Console.WriteLine($"Updating frontend '{request.Identifier}'...");
+                EnumerateResponse(await _Sdk.Frontend.Update(identifier, request));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating frontend: {ex.Message}");
+            }
+        }
+
+        private static async Task TestDeleteFrontend()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                string identifier = Inputty.GetString("Frontend identifier to delete:", null, false);
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    Console.WriteLine("Frontend identifier is required.");
+                    return;
+                }
+
+                bool confirm = Inputty.GetBoolean($"Are you sure you want to delete frontend '{identifier}'?", false);
+                if (!confirm)
+                {
+                    Console.WriteLine("Delete cancelled.");
+                    return;
+                }
+
+                Console.WriteLine($"Deleting frontend: {identifier}...");
+                bool success = await _Sdk.Frontend.Delete(identifier);
+
+                if (success)
+                {
+                    Console.WriteLine("Frontend deleted successfully.");
+                }
+                else
+                {
+                    Console.WriteLine("Failed to delete frontend.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deleting frontend: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region OpenAI-API-Tests
+
+        private static async Task TestOpenAICompletion()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Testing OpenAI-compatible text completion...");
+                var request = BuildObject<OpenAIGenerateCompletionRequest>();
+                EnumerateResponse(await _Sdk.OpenAI.GenerateCompletion(request));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating OpenAI completion: {ex.Message}");
+            }
+        }
+
+        private static async Task TestOpenAIChatCompletion()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Testing OpenAI-compatible chat completion...");
+                var request = BuildObject<OpenAIGenerateChatCompletionRequest>();
+                EnumerateResponse(await _Sdk.OpenAI.GenerateChatCompletion(request));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating OpenAI chat completion: {ex.Message}");
+            }
+        }
+
+        private static async Task TestOpenAIEmbeddingsSingle()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Testing OpenAI-compatible single embeddings...");
+                var request = BuildObject<OpenAIGenerateEmbeddingsRequest>();
+                EnumerateResponse(await _Sdk.OpenAI.GenerateEmbeddings(request));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating OpenAI embeddings: {ex.Message}");
+            }
+        }
+
+        private static async Task TestOpenAIEmbeddingsMultiple()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Testing OpenAI-compatible multiple embeddings...");
+                var request = BuildObject<OpenAIGenerateEmbeddingsRequest>();
+                EnumerateResponse(await _Sdk.OpenAI.GenerateEmbeddings(request));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating OpenAI multiple embeddings: {ex.Message}");
+            }
+        }
+
+        private static async Task TestOpenAIStreamingCompletion()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Testing OpenAI-compatible streaming text completion...");
+                var request = BuildObject<OpenAIGenerateCompletionRequest>();
+
+                Console.Write("Completion: ");
+                await foreach (var chunk in _Sdk.OpenAI.GenerateCompletionStream(request))
+                {
+                    if (chunk?.Choices != null && chunk.Choices.Count > 0)
+                    {
+                        var text = chunk.Choices[0]?.Text;
+                        if (!string.IsNullOrEmpty(text))
+                            Console.Write(text);
+                    }
+                }
+                Console.WriteLine();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error streaming OpenAI completion: {ex.Message}");
+            }
+        }
+
+        private static async Task TestOpenAIStreamingChatCompletion()
+        {
+            if (_Sdk == null)
+            {
+                Console.WriteLine("SDK not initialized.");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("Testing OpenAI-compatible streaming chat completion...");
+                var request = BuildObject<OpenAIGenerateChatCompletionRequest>();
+
+                Console.Write("Assistant: ");
+                await foreach (var chunk in _Sdk.OpenAI.GenerateChatCompletionStream(request))
+                {
+                    if (chunk?.Choices != null && chunk.Choices.Count > 0)
+                    {
+                        var contentObj = chunk.Choices[0]?.Delta?.Content;
+                        string? deltaText = null;
+                        if (contentObj is string s)
+                        {
+                            deltaText = s;
+                        }
+                        else if (contentObj is JsonElement je)
+                        {
+                            if (je.ValueKind == JsonValueKind.String)
+                                deltaText = je.GetString();
+                            else
+                                deltaText = je.ToString();
+                        }
+
+                        if (!string.IsNullOrEmpty(deltaText))
+                            Console.Write(deltaText);
+                    }
+                }
+                Console.WriteLine();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error streaming OpenAI chat completion: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Ollama-API-Tests
 
         private static async Task SetCurrentModel()
         {
@@ -850,521 +1458,8 @@ namespace TestOllamaFlowSdk
             }
         }
 
-        private static async Task TestListBackends()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Listing all backends...");
-                var backends = await _Sdk.Backend.RetrieveMany();
-
-                if (backends != null && backends.Count > 0)
-                {
-                    Console.WriteLine($"Found {backends.Count} backends:");
-                    EnumerateResponse(backends);
-                }
-                else
-                {
-                    Console.WriteLine("No backends found.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error listing backends: {ex.Message}");
-            }
-        }
-
-        private static async Task TestListBackendHealth()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Listing all backends with health status...");
-                var backends = await _Sdk.Backend.RetrieveAllHealth();
-
-                if (backends != null && backends.Count > 0)
-                {
-                    Console.WriteLine($"Found {backends.Count} backends:");
-                    EnumerateResponse(backends);
-                }
-                else
-                {
-                    Console.WriteLine("No backends found.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error listing backend health: {ex.Message}");
-            }
-        }
-
-        private static async Task TestGetBackend()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Backend identifier:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Backend identifier is required.");
-                    return;
-                }
-
-                Console.WriteLine($"Getting backend: {identifier}...");
-                var backend = await _Sdk.Backend.Retrieve(identifier);
-
-                if (backend != null)
-                {
-                    Console.WriteLine("Backend found:");
-                    EnumerateResponse(backend);
-                }
-                else
-                {
-                    Console.WriteLine("Backend not found.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error getting backend: {ex.Message}");
-            }
-        }
-
-        private static async Task TestGetBackendHealth()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Backend identifier:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Backend identifier is required.");
-                    return;
-                }
-
-                Console.WriteLine($"Getting backend health: {identifier}...");
-                EnumerateResponse(await _Sdk.Backend.RetrieveHealth(identifier));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error getting backend health: {ex.Message}");
-            }
-        }
-
-        private static async Task TestBackendExists()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Backend identifier:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Backend identifier is required.");
-                    return;
-                }
-
-                Console.WriteLine($"Checking if backend exists: {identifier}...");
-                bool exists = await _Sdk.Backend.Exists(identifier);
-                Console.WriteLine($"Backend '{identifier}' exists: {exists}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error checking backend existence: {ex.Message}");
-            }
-        }
-
-        private static async Task TestCreateBackend()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Creating new backend...");
-
-                Backend request = BuildObject<Backend>();
-
-                if (string.IsNullOrEmpty(request.Identifier) || string.IsNullOrEmpty(request.Name))
-                {
-                    Console.WriteLine("Backend identifier and name are required.");
-                    return;
-                }
-
-                Console.WriteLine($"Creating backend '{request.Identifier}'...");
-                EnumerateResponse(await _Sdk.Backend.Create(request));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating backend: {ex.Message}");
-            }
-        }
-
-        private static async Task TestUpdateBackend()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Backend identifier to update:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Backend identifier is required.");
-                    return;
-                }
-
-                Backend request = BuildObject<Backend>();
-                Console.WriteLine($"Updating backend '{request.Identifier}'...");
-                EnumerateResponse(await _Sdk.Backend.Update(identifier, request));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error updating backend: {ex.Message}");
-            }
-        }
-
-        private static async Task TestDeleteBackend()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Backend identifier to delete:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Backend identifier is required.");
-                    return;
-                }
-
-                bool confirm = Inputty.GetBoolean($"Are you sure you want to delete backend '{identifier}'?", false);
-                if (!confirm)
-                {
-                    Console.WriteLine("Delete cancelled.");
-                    return;
-                }
-
-                Console.WriteLine($"Deleting backend: {identifier}...");
-                bool success = await _Sdk.Backend.Delete(identifier);
-
-                if (success)
-                {
-                    Console.WriteLine("Backend deleted successfully.");
-                }
-                else
-                {
-                    Console.WriteLine("Failed to delete backend.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error deleting backend: {ex.Message}");
-            }
-        }
-
-        private static async Task TestListFrontends()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Listing all frontends...");
-                var frontends = await _Sdk.Frontend.RetrieveMany();
-
-                if (frontends != null && frontends.Count > 0)
-                {
-                    Console.WriteLine($"Found {frontends.Count} frontends:");
-                    EnumerateResponse(frontends);
-                }
-                else
-                {
-                    Console.WriteLine("No frontends found.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error listing frontends: {ex.Message}");
-            }
-        }
-
-        private static async Task TestGetFrontend()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Frontend identifier:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Frontend identifier is required.");
-                    return;
-                }
-
-                Console.WriteLine($"Getting frontend: {identifier}...");
-                var frontend = await _Sdk.Frontend.Retrieve(identifier);
-
-                if (frontend != null)
-                {
-                    Console.WriteLine("Frontend found:");
-                    EnumerateResponse(frontend);
-                }
-                else
-                {
-                    Console.WriteLine("Frontend not found.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error getting frontend: {ex.Message}");
-            }
-        }
-
-        private static async Task TestFrontendExists()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Frontend identifier:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Frontend identifier is required.");
-                    return;
-                }
-
-                Console.WriteLine($"Checking if frontend exists: {identifier}...");
-                bool exists = await _Sdk.Frontend.Exists(identifier);
-                Console.WriteLine($"Frontend '{identifier}' exists: {exists}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error checking frontend existence: {ex.Message}");
-            }
-        }
-
-        private static async Task TestCreateFrontend()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Creating new frontend...");
-
-                Frontend request = BuildObject<Frontend>();
-
-                if (string.IsNullOrEmpty(request.Identifier) || string.IsNullOrEmpty(request.Name))
-                {
-                    Console.WriteLine("Frontend identifier and name are required.");
-                    return;
-                }
-
-                Console.WriteLine($"Creating frontend '{request.Identifier}'...");
-                EnumerateResponse(await _Sdk.Frontend.Create(request));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating frontend: {ex.Message}");
-            }
-        }
-
-        private static async Task TestUpdateFrontend()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Frontend identifier to update:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Frontend identifier is required.");
-                    return;
-                }
-
-                Frontend request = BuildObject<Frontend>();
-                Console.WriteLine($"Updating frontend '{request.Identifier}'...");
-                EnumerateResponse(await _Sdk.Frontend.Update(identifier, request));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error updating frontend: {ex.Message}");
-            }
-        }
-
-        private static async Task TestDeleteFrontend()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                string identifier = Inputty.GetString("Frontend identifier to delete:", null, false);
-                if (string.IsNullOrEmpty(identifier))
-                {
-                    Console.WriteLine("Frontend identifier is required.");
-                    return;
-                }
-
-                bool confirm = Inputty.GetBoolean($"Are you sure you want to delete frontend '{identifier}'?", false);
-                if (!confirm)
-                {
-                    Console.WriteLine("Delete cancelled.");
-                    return;
-                }
-
-                Console.WriteLine($"Deleting frontend: {identifier}...");
-                bool success = await _Sdk.Frontend.Delete(identifier);
-
-                if (success)
-                {
-                    Console.WriteLine("Frontend deleted successfully.");
-                }
-                else
-                {
-                    Console.WriteLine("Failed to delete frontend.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error deleting frontend: {ex.Message}");
-            }
-        }
-
-        private static async Task TestOpenAICompletion()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Testing OpenAI-compatible text completion...");
-                var request = BuildObject<OpenAIGenerateCompletionRequest>();
-                EnumerateResponse(await _Sdk.OpenAI.GenerateCompletion(request));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error generating OpenAI completion: {ex.Message}");
-            }
-        }
-
-        private static async Task TestOpenAIChatCompletion()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Testing OpenAI-compatible chat completion...");
-                var request = BuildObject<OpenAIGenerateChatCompletionRequest>();
-                EnumerateResponse(await _Sdk.OpenAI.GenerateChatCompletion(request));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error generating OpenAI chat completion: {ex.Message}");
-            }
-        }
-
-        private static async Task TestOpenAIEmbeddingsSingle()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Testing OpenAI-compatible single embeddings...");
-                var request = BuildObject<OpenAIGenerateEmbeddingsRequest>();
-                EnumerateResponse(await _Sdk.OpenAI.GenerateEmbeddings(request));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error generating OpenAI embeddings: {ex.Message}");
-            }
-        }
-
-        private static async Task TestOpenAIEmbeddingsMultiple()
-        {
-            if (_Sdk == null)
-            {
-                Console.WriteLine("SDK not initialized.");
-                return;
-            }
-
-            try
-            {
-                Console.WriteLine("Testing OpenAI-compatible multiple embeddings...");
-                var request = BuildObject<OpenAIGenerateEmbeddingsRequest>();
-                EnumerateResponse(await _Sdk.OpenAI.GenerateEmbeddings(request));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error generating OpenAI multiple embeddings: {ex.Message}");
-            }
-        }
-
+        #endregion
+        
         private static T BuildObject<T>()
         {
             string json = Inputty.GetString("JSON :", null, false);
