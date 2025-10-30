@@ -211,7 +211,7 @@ All methods return null (or empty lists) on non-success responses and do not thr
 
 ## 📊 Version History
 
-See CHANGELOG.md for release notes.
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## 📄 License
 
