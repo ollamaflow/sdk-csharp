@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>OllamaFlow.Sdk</AssemblyName>
+    <RootNamespace>OllamaFlow.Sdk</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OllamaFlow.Core" Version="1.1.3" />
+    <PackageReference Include="RestWrapper" Version="3.1.8" />
+  </ItemGroup>
+
+</Project>
+
+
