@@ -1,20 +1,12 @@
 # Change Log
 
-## Current Version
+### OllamaFlow.Sdk
 
-v1.1.x
+v1.0.0
 
-- Added support for OpenAI backends such as vLLM
-- Major internal refactor and rearchitecture
-- Support for allow/disallow of embeddings or completion requests
-- Request property pinning for compliance and enforcement
-- Request routing control through `Backend.Labels` and `X-OllamaFlow-Label` header
-- Expose APIs natively through OllamaFlowDaemon for direct integration into C# applications
-- Implemented IDisposable, cancellation tokens, and configure await
-- Bugfixes
-
-## Previous Versions
-
-v1.0.x
-
-- Initial release
+- Initial commit of `OllamaFlow.Sdk`
+- Added Ollama and OpenAI-compatible client APIs with streaming support
+- Added Frontend and Backend admin method groups (create/update/get/delete, health)
+- Introduced logging toggles and pluggable logger delegate
+- Added NuGet packaging metadata and assets (README, icon, license)
+- Targeted .NET 8 with nullable and implicit usings enabled
